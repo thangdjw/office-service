@@ -1,0 +1,40 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '2.1.8.RELEASE'
+    id 'io.spring.dependency-management' version '1.0.8.RELEASE'
+}
+
+group 'com.office'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+    maven { url "http://repository.aspose.com/repo/" }
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    compile group: 'org.apache.poi', name: 'poi', version: '4.1.0'
+    compile group: 'org.apache.poi', name: 'poi-ooxml', version: '4.1.0'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.7'
+    compile 'com.google.guava:guava:28.1-jre'
+    compile group: 'commons-io', name: 'commons-io', version: '2.4'
+    compileOnly 'org.projectlombok:lombok:1.18.10'
+    annotationProcessor 'org.projectlombok:lombok:1.18.10'
+    compile group: 'org.springframework.data', name: 'spring-data-jpa', version: '2.1.10.RELEASE'
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-websocket'
+    compile group: 'org.webjars', name: 'webjars-locator', version: '0.37'
+    compile group: 'org.webjars', name: 'sockjs-client', version: '1.0.2'
+    compile group: 'org.webjars', name: 'stomp-websocket', version: '2.3.3'
+    compile group: 'org.webjars', name: 'bootstrap', version: '4.3.1'
+    compile group: 'org.webjars', name: 'jquery', version: '3.4.1'
+    compile group: 'org.hibernate', name: 'hibernate-core', version: '5.4.5.Final'
+    compile group: 'com.vladmihalcea', name: 'hibernate-types-52', version: '2.4.3'
+    compile group: 'com.konghq', name: 'unirest-java', version: '2.3.17'
+    compile group: 'org.zalando', name: 'logbook-spring-boot-starter', version: '1.13.0'
+    compile group: 'org.zalando', name: 'logbook-spring-boot-starter', version: '1.13.0'
+    compile group: 'com.aspose', name: 'aspose-cells', version: '19.8'
+}
+
