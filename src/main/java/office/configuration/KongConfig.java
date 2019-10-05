@@ -17,7 +17,6 @@ import java.io.IOException;
 public class KongConfig implements ApplicationListener<ApplicationReadyEvent> {
 
     public void initKongUnirest() {
-        System.out.println("init Kong");
         ObjectMapper objectMapper = new ObjectMapper() {
             com.fasterxml.jackson.databind.ObjectMapper mapper
                     = new com.fasterxml.jackson.databind.ObjectMapper();
