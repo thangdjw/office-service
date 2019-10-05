@@ -1,78 +1,108 @@
 package office.module.excel.service.extraction;
 
-import com.aspose.cells.NameCollection;
-import com.aspose.cells.Workbook;
-import com.aspose.cells.Worksheet;
-import com.aspose.cells.WorksheetCollection;
+import com.aspose.cells.*;
 import lombok.extern.slf4j.Slf4j;
+import office.module.excel.model.ExtractedWorksheetInfo;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
-@Service
 @Slf4j
+@Service
 public class SimpleExtractorService {
-    private static ExecutorService service;
+    private static ExecutorService async;
 
     static {
         initExecutorService();
     }
 
     public static void initExecutorService() {
-        if (service != null && service.isShutdown()) return;
+        if (async != null && async.isShutdown()) return;
         int availableThread = Runtime.getRuntime().availableProcessors();
         if (availableThread == 1) {
-            service = Executors.newCachedThreadPool();
+            async = Executors.newCachedThreadPool();
             log.info("init executer in cached threadpool mode");
         } else {
-            service = Executors.newFixedThreadPool(availableThread - 1);
+            async = Executors.newFixedThreadPool(availableThread - 1);
             log.info("init executer in fixed thread pool mode : " + (availableThread - 1));
         }
 
         log.info("Threadpool created");
     }
 
-    public List<Future<Object>> extractSheet(byte[] data, ExtractStrategy strategy) {
-        List<Future<Object>> tasks = new ArrayList<>();
+    public int extractWorkbook(byte[] data, ExtractStrategy strategy) {
         try {
             Workbook sourceWorkbook = new Workbook(new ByteArrayInputStream(data));
             WorksheetCollection sourceWorksheetCollection = sourceWorkbook.getWorksheets();
-            NameCollection sheetNames = sourceWorksheetCollection.getNames();
-            System.out.println("num of sheet : " + sheetNames.getCount());
+            strategy.getExceptSheet().forEach(sourceWorksheetCollection::removeAt);
+            sourceWorkbook.getSettings().setCreateCalcChain(false);
+            sourceWorkbook.calculateFormula();
 
-            for (int i = 0; i < sheetNames.getCount() - 1; i++) {
-                Worksheet sourceWorksheet = sourceWorksheetCollection.get(i);
-                String sheetName = sourceWorksheet.getName();
-                if (strategy.getExceptSheet().contains(sheetName)) continue;
+            System.out.println("num of sheet : " + sourceWorksheetCollection.getCount());
 
-                Callable<Object> task = () -> {
-                    strategy.getPinSheet().add(sheetName);
-                    Workbook targetWorkbook = new Workbook();
-                    for (String pinsheetName : strategy.getPinSheet()) {
-                        WorksheetCollection targetWorksheetCollection = targetWorkbook.getWorksheets();
-                        Worksheet targetWorksheet = targetWorksheetCollection.add(pinsheetName);
-                        try {
-                            targetWorksheet.copy(sourceWorksheet);
-                            return strategy.getOnComplete().apply(targetWorkbook);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            return strategy.getOnError().apply(e);
-                        }
-                    }
-                    return targetWorkbook;
-                };
+            for (int i = 0; i < sourceWorksheetCollection.getCount(); i++) {
 
-                tasks.add(service.submit(task));
+                final int sheetIndex = i;
+                async.submit(() -> {
+                    Worksheet sourceWorksheet = sourceWorksheetCollection.get(sheetIndex);
+                    String sheetName = sourceWorksheet.getName();
+                    extractWorksheet(strategy, sourceWorkbook, sheetName, sheetIndex);
+                });
             }
+            return sourceWorksheetCollection.getCount();
         } catch (Exception e) {
-            strategy.getOnError().apply(e);
+            e.printStackTrace();
+            ExtractedWorksheetInfo info = new ExtractedWorksheetInfo();
+            info.setSheetName("root");
+            strategy.getOnError().apply(e, info);
         }
-        return tasks;
+        return 0;
+    }
+
+    private void extractWorksheet(ExtractStrategy strategy, Workbook sourceWorksbook, String sheetName, int sheetIndex) {
+        List<String> includeSheets = new ArrayList<>(strategy.getPinSheet());
+        includeSheets.add(0, sheetName);
+        System.out.println("extract sheet set : " + includeSheets);
+        Workbook targetWorkbook = new Workbook();
+        targetWorkbook.getSettings().setCreateCalcChain(false);
+        targetWorkbook.calculateFormula();
+        targetWorkbook.getWorksheets().removeAt(0);
+        ExtractedWorksheetInfo info = new ExtractedWorksheetInfo();
+        info.setSheetName(sheetName);
+        info.setSheetIndex(sheetIndex);
+        boolean isHiddenAllSheet = strategy.getHiddenSheet().size() > 0
+                && strategy.getHiddenSheet().containsAll(includeSheets);
+
+        if (isHiddenAllSheet) {
+            strategy.getOnComplete().apply(targetWorkbook, info);
+            log.info("skip because hidden all");
+            return;
+        }
+        WorksheetCollection targetWorksheetCollection = targetWorkbook.getWorksheets();
+        for (String pinsheetName : includeSheets) {
+            Worksheet targetWorksheet = targetWorksheetCollection.add(pinsheetName);
+            Worksheet sourceWorksheet = sourceWorksbook.getWorksheets().get(pinsheetName);
+            try {
+//                log.info("copy sheet : {}", pinsheetName);
+                CopyOptions options = new CopyOptions();
+                options.setCopyNames(true);
+                options.setReferToSheetWithSameName(true);
+                options.setCopyInvalidFormulasAsValues(true);
+                options.setReferToDestinationSheet(false);
+                options.setExtendToAdjacentRange(true);
+                targetWorksheet.copy(sourceWorksheet, options);
+                if (strategy.getHiddenSheet().contains(pinsheetName)) {
+                    targetWorksheet.setVisibilityType(VisibilityType.HIDDEN);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                strategy.getOnError().apply(e, info);
+            }
+        }
+        strategy.getOnComplete().apply(targetWorkbook, info);
     }
 }

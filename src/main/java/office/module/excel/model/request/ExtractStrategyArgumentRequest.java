@@ -1,5 +1,6 @@
 package office.module.excel.model.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -10,7 +11,16 @@ import java.util.List;
 @Setter
 @ToString
 public class ExtractStrategyArgumentRequest {
-    private List<String> exceptsheet;
-    private List<String> pinsheet;
-    private List<String> hiddensheet;
+    @JsonProperty("except_sheet")
+    private List<String> exceptSheet;
+    @JsonProperty("pin_sheet")
+    private List<String> pinSheet;
+    @JsonProperty("hidden_sheet")
+    private List<String> hiddenSheet;
+    @JsonProperty("owner_id")
+    private String ownerId;
+    @JsonProperty("reference_id")
+    private String referenceId;
+    @JsonProperty("type")
+    private String type = "xlsx";
 }

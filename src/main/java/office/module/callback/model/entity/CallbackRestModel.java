@@ -1,13 +1,14 @@
 package office.module.callback.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.http.HttpMethod;
 
 import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 
 @Getter
@@ -15,12 +16,10 @@ import java.util.Map;
 @ToString
 public class CallbackRestModel implements Serializable {
     @NotNull
+    @JsonProperty("target_url")
     private String targetUrl;
-    @NotNull
-    private String callbackKey;
-    private HttpMethod requestMethod;
-    private Map<String, String> headers;
-    private Object body;
-    private Map<String, Object> arguments;
+    private Map<String, String> headers = new HashMap<>();
+    private Map<String, Object> arguments = new HashMap<>();
+    @JsonProperty("create_date")
     private Date createDate;
 }

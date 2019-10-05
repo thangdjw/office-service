@@ -1,83 +1,85 @@
-import com.aspose.cells.*;
-import office.module.callback.model.entity.CallbackRestModel;
-import office.module.callback.service.CallbackService;
-import office.module.callback.service.HttpCallbackRequest;
-import office.module.excel.model.response.ExtractSheetResponse;
+import com.aspose.cells.CalculationOptions;
+import com.aspose.cells.NameCollection;
+import com.aspose.cells.Workbook;
+import com.aspose.cells.WorksheetCollection;
+import com.google.common.io.Files;
+import office.module.excel.model.request.ExtractStrategyArgumentRequest;
 import office.module.excel.service.extraction.CallbackServiceForwardHandler;
 import office.module.excel.service.extraction.ExtractStrategy;
 import office.module.excel.service.extraction.SimpleExtractorService;
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Test;
 
+import java.awt.*;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.nio.charset.Charset;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 public class Random {
 
     @Test
-    public void testExtract() throws IOException, InterruptedException {
-        CountDownLatch countDownLatch = new CountDownLatch(1);
-        new CallbackService().getCallback("callbacktest1");
+    public void testAPI() throws IOException, InterruptedException {
+        byte[] fileRaw = Files.toByteArray(new File("./src/test/resources/09_2019_DS P1_luong_kinh doanh_thang_09.2019.xlsx"));
         ExtractStrategy strategy = new ExtractStrategy.Builder()
-                .onComplete((w) -> {
-                    System.out.println("call on handle");
-//                    return CallbackService.call(callbackModel, new CallbackServiceForwardHandler(w, e));
-                    ExtractSheetResponse body = new CallbackServiceForwardHandler(w).getBody(null, null);
-                    System.out.println(body);
+//                .pinSheet(Arrays.asList("Tonghop", "data", "rp"))
+//                .hiddenSheet(Arrays.asList("Tonghop", "data", "rp"))
+                .onComplete((workbook, info) -> {
+                    try {
+                        String path = "./src/test/resources/extract/" + info.getSheetName()+".xlsx";
+                        System.out.println("save file to : " + path);
+                        workbook.calculateFormula();
+                        workbook.save(path);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                })
+                .onError((error, info) -> {
+                    CallbackServiceForwardHandler forwardHandle = new CallbackServiceForwardHandler(new ExtractStrategyArgumentRequest());
+                    forwardHandle.setErrorBody(error, info);
+                    error.printStackTrace();
+                    return null;
                 })
                 .build();
-
-        SimpleExtractorService.extractSheet(FileUtils.readFileToByteArray(new File("./src/test/resources/test.xlsx")), strategy);
-        countDownLatch.await();
+        int count = new SimpleExtractorService().extractWorkbook(fileRaw, strategy);
+        System.out.println("count : "+count);
+        Thread.sleep(20000);
     }
 
     @Test
-    public void test() throws ExecutionException, InterruptedException {
-        CallbackService callbackService = new CallbackService();
-        CallbackRestModel callbacktest1 = callbackService.getCallback("callbacktest1");
-        CallbackService.call(callbacktest1, new HttpCallbackRequest() {
-            @Override
-            public Object getBody(Object body, Map<String, Object> args) {
-                return "hello world";
-            }
-
-            @Override
-            public Map<String, String> getHeaders(Map<String, String> defaultHeader) {
-                return null;
-            }
-        });
-        System.out.println("call success");
-    }
-
-    @Test
-    public void testLib() throws Exception {
-        Workbook sourceWorkbook = new Workbook(new FileInputStream("./src/test/resources/test.xlsx"));
-
-        WorksheetCollection sourceWorksheetCollection = sourceWorkbook.getWorksheets();
-
-        NameCollection sheetNames = sourceWorksheetCollection.getNames();
-        System.out.println("num of sheet : " + sheetNames.getCount());
-        List<File> result = new ArrayList();
-        for (int i = 0; i < sheetNames.getCount() - 1; i++) {
-            Workbook targetWorkbook = new Workbook();
-            WorksheetCollection targetWorksheetCollection = targetWorkbook.getWorksheets();
-            Worksheet sourceWorksheet = sourceWorksheetCollection.get(i);
-            String sheetName = sourceWorksheet.getName();
-            Worksheet targetWorksheet = targetWorksheetCollection.add(sheetName);
-            targetWorksheet.copy(sourceWorksheet);
-            System.out.println("current sheet name : " + sheetName);
-            File targetFile = new File("./src/test/resources/extract/" + sheetName + ".xlsx");
-            targetWorkbook.save(new FileOutputStream(targetFile), SaveFormat.XLSX);
-            result.add(targetFile);
-//            Desktop.getDesktop().open(targetFile);
+    public void calculateFormular() throws Exception {
+        String path = "./src/test/resources/09_2019_DS P1_luong_kinh doanh_thang_09.2019.xlsx";
+        Workbook sourceWorkbook = new Workbook(path);
+        WorksheetCollection names = sourceWorkbook.getWorksheets();
+        int count = names.getCount();
+        System.out.println(count);
+        for(int i = 0; i<count; i++){
+            System.out.println(sourceWorkbook.getWorksheets().get(i).getName());
         }
 
+        Desktop.getDesktop().open(new File(path));
     }
+
+    @Test
+    public void calculateFormular1() throws Exception {
+        ZipSecureFile.setMinInflateRatio(0);
+        String path = "./src/test/resources/09_2019_DS P1_luong_kinh doanh_thang_09.2019.xlsx";
+        org.apache.poi.ss.usermodel.Workbook workbook = WorkbookFactory.create(new File(path));
+        System.out.println(workbook.getAllNames().size());
+    }
+
+    @Test
+    public void mapperTest() throws IOException {
+        List<String> input = Files.readLines(new File( "./src/test/resources/enc"), Charset.defaultCharset());
+        byte[] data = Base64.decodeBase64(input.get(0));
+        String tpath = "./src/test/resources/test-enc.xlsx";
+        Files.write(data, new File(tpath));
+
+    }
+
 }

@@ -2,54 +2,71 @@ package office.module.excel.service.extraction;
 
 import com.aspose.cells.SaveFormat;
 import com.aspose.cells.Workbook;
+import com.google.common.io.Files;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import office.module.callback.service.HttpCallbackRequest;
+import office.module.excel.model.ExtractedWorksheetInfo;
+import office.module.excel.model.request.ExtractStrategyArgumentRequest;
 import office.module.excel.model.response.ExtractSheetResponse;
+import org.apache.commons.codec.binary.Base64;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.util.Date;
-import java.util.Map;
 
 @Slf4j
 @AllArgsConstructor
-public class CallbackServiceForwardHandler implements HttpCallbackRequest {
-    private Workbook workbook;
-    private Exception error;
+public class CallbackServiceForwardHandler extends HttpCallbackRequest<ExtractSheetResponse> {
 
-    @Override
-    public ExtractSheetResponse getBody(Object body, Map<String, Object> args) {
-        log.info("call CallbackServiceForwardHandler::getBody");
+    private ExtractStrategyArgumentRequest strategyRequest;
+
+    public void setBody(Workbook workbook, ExtractedWorksheetInfo info) {
+        log.info("save to stream");
         byte[] raw = null;
-        String messenge = error.getMessage();
-        String fileName = workbook.getBuiltInDocumentProperties().get("filename").getValue().toString();
-        boolean isSuccessed = false;
+        String message = null;
+        boolean isSuccess = false;
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            log.info("writing to outstream : {}", workbook);
             workbook.save(outputStream, SaveFormat.XLSX);
             raw = outputStream.toByteArray();
             outputStream.close();
             outputStream.flush();
-            isSuccessed = true;
+            isSuccess = true;
         } catch (Exception e) {
             log.error("get raw body content error", e);
-            messenge = "extract failed : " + e.getMessage();
+            message = e.getMessage();
         }
 
         ExtractSheetResponse result = new ExtractSheetResponse();
-        result.setName(fileName);
-        result.setData(raw);
-        result.setLength(raw == null ? 0 : raw.length);
+        String sheetName = info.getSheetName();
+        result.setFileName(sheetName + ".xlsx");
+        result.setType("XLSX");
+        result.setSheetName(sheetName);
+        result.setData(Base64.encodeBase64String(raw));
+        result.setSheetIndex(info.getSheetIndex());
+        result.setSize(raw == null ? 0 : raw.length);
         result.setCreateDate(new Date());
-        result.setSuccess(isSuccessed);
-        result.setMessage(messenge);
-        log.info("ExtractSheetResponse : {}", result);
-        return result;
+        result.setSuccess(isSuccess);
+        result.setMessage(message);
+        result.setOwnerId(strategyRequest.getOwnerId());
+        result.setReferenceId(strategyRequest.getReferenceId());
+//        log.info("ExtractSheetResponse : {}", result);
+        this.body = result;
     }
 
-    @Override
-    public Map<String, String> getHeaders(Map<String, String> defaultHeader) {
-        return defaultHeader;
+    public void setErrorBody(Exception error, ExtractedWorksheetInfo info) {
+        ExtractSheetResponse result = new ExtractSheetResponse();
+        result.setSheetName(info.getSheetName());
+        result.setCreateDate(new Date());
+        result.setType("XLSX");
+        result.setSuccess(false);
+        result.setMessage(error.getMessage());
+        result.setOwnerId(strategyRequest.getOwnerId());
+        result.setReferenceId(strategyRequest.getReferenceId());
+        log.info("Error body : {}", result);
+        this.body = result;
     }
+
 }
